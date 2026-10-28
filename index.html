@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#070b14">
+    <title>Brick Breaker</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        min-height: 100%;
+        margin: 0;
+      }
+
+      body {
+        display: grid;
+        min-height: 100vh;
+        min-height: 100svh;
+        place-items: center;
+        overflow: hidden;
+        background: radial-gradient(ellipse at center, #101a2d 0%, #070b14 72%);
+        color: #e8f7ff;
+        font-family: "Segoe UI", sans-serif;
+      }
+
+      .game-container {
+        position: relative;
+        width: min(800px, calc(100vw - 32px), calc((100vh - 32px) * 4 / 3));
+        width: min(800px, calc(100vw - 32px), calc((100svh - 32px) * 4 / 3));
+        aspect-ratio: 4 / 3;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 1px solid #263b58;
+        border-radius: 8px;
+        background: #080e1b;
+        box-shadow: 0 18px 70px #0009, 0 0 32px #42d9ff16;
+        touch-action: none;
+      }
+
+      #return-to-menu {
+        position: absolute;
+        top: 62%;
+        left: 50%;
+        min-width: 230px;
+        min-height: 52px;
+        transform: translate(-50%, -50%);
+        border: 2px solid #55c7ff;
+        border-radius: 8px;
+        background: #12304a;
+        box-shadow: 0 0 18px #42d9ff55;
+        color: #e8f7ff;
+        font: bold 16px monospace;
+        cursor: pointer;
+      }
+
+      #return-to-menu:hover,
+      #return-to-menu:focus-visible {
+        background: #1b4969;
+        outline: 2px solid #ffffff;
+        outline-offset: 3px;
+      }
+
+      #return-to-menu[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-container">
+      <canvas id="game" width="800" height="600" tabindex="0" aria-label="Jogo Brick Breaker">
+        Seu navegador não oferece suporte ao canvas.
+      </canvas>
+      <button id="return-to-menu" type="button" hidden>VOLTAR AO MENU INICIAL</button>
+    </div>
+    <script src="game.js"></script>
+  </body>
+</html>

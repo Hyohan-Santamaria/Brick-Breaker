@@ -176,6 +176,15 @@ const boss = {
   dx: 3,
   active: false
 };
+const bossExplosion = {
+  active: false,
+  elapsed: 0,
+  startedAt: 0,
+  x: 0,
+  y: 0,
+  particles: []
+};
+const BOSS_VICTORY_DELAY_MS = 1900;
 
 let score = 0;
 let lives = CONFIG.startingLives;
@@ -301,6 +310,8 @@ function resetGame() {
   powerUps.length = 0;
   particles.length = 0;
   bossMeteors.length = 0;
+  bossExplosion.active = false;
+  bossExplosion.particles.length = 0;
   createBricks();
   resetBall();
   boss.active = false;
@@ -440,6 +451,8 @@ function initBoss() {
   boss.active = true;
   bossMeteors.length = 0;
   bossMeteorElapsed = 0;
+  bossExplosion.active = false;
+  bossExplosion.particles.length = 0;
   bricks.length = 0;
 }
 
@@ -505,6 +518,12 @@ function drawBossMeteors() {
 }
 
 function drawBossVictory() {
+  if (performance.now() - bossExplosion.startedAt < BOSS_VICTORY_DELAY_MS) {
+    drawBossExplosion();
+    return;
+  }
+
+  drawBossExplosion();
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillStyle = "#FFD700";
@@ -523,6 +542,88 @@ function drawBossVictory() {
   context.fillStyle = "#c3cedd";
   context.font = "16px monospace";
   context.fillText("Pressione R para jogar novamente", CONFIG.canvasWidth / 2, 490);
+}
+
+function startBossExplosion() {
+  const colors = ["#fff7a1", "#ffd54a", "#ff8c32", "#f34b2b", "#e7f2ff"];
+  bossExplosion.active = true;
+  bossExplosion.elapsed = 0;
+  bossExplosion.startedAt = performance.now();
+  bossExplosion.x = boss.x + boss.width / 2;
+  bossExplosion.y = boss.y + boss.height / 2;
+  bossExplosion.particles = Array.from({ length: 64 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2.5 + Math.random() * 6;
+    return {
+      x: bossExplosion.x,
+      y: bossExplosion.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      age: 0,
+      lifetime: BOSS_VICTORY_DELAY_MS / 1000,
+      size: 3 + Math.random() * 5,
+      color: colors[Math.floor(Math.random() * colors.length)]
+    };
+  });
+}
+
+function updateBossExplosion(deltaTime) {
+  if (!bossExplosion.active) {
+    return;
+  }
+
+  bossExplosion.elapsed += deltaTime;
+  for (let index = bossExplosion.particles.length - 1; index >= 0; index -= 1) {
+    const particle = bossExplosion.particles[index];
+    particle.age += deltaTime;
+    particle.x += particle.vx * deltaTime * 60;
+    particle.y += particle.vy * deltaTime * 60;
+    particle.vy += 0.08 * deltaTime * 60;
+    if (particle.age >= particle.lifetime) {
+      bossExplosion.particles.splice(index, 1);
+    }
+  }
+
+  if (bossExplosion.particles.length === 0) {
+    bossExplosion.active = false;
+  }
+}
+
+function drawBossExplosion() {
+  if (!bossExplosion.active) {
+    return;
+  }
+
+  context.save();
+  if (bossExplosion.elapsed < 0.22) {
+    const progress = bossExplosion.elapsed / 0.22;
+    context.globalAlpha = 1 - progress;
+    context.beginPath();
+    context.arc(bossExplosion.x, bossExplosion.y, 38 * (1 - progress), 0, Math.PI * 2);
+    context.fillStyle = "#fff7a1";
+    context.fill();
+  }
+  if (bossExplosion.elapsed < 0.8) {
+    const progress = bossExplosion.elapsed / 0.8;
+    context.globalAlpha = 1 - progress;
+    context.beginPath();
+    context.arc(bossExplosion.x, bossExplosion.y, 18 + progress * 162, 0, Math.PI * 2);
+    context.strokeStyle = progress < 0.5 ? "#fff7a1" : "#ff8c32";
+    context.lineWidth = 8 * (1 - progress) + 1;
+    context.stroke();
+  }
+
+  for (const particle of bossExplosion.particles) {
+    context.globalAlpha = 1 - particle.age / particle.lifetime;
+    context.fillStyle = particle.color;
+    context.fillRect(
+      particle.x - particle.size / 2,
+      particle.y - particle.size / 2,
+      particle.size,
+      particle.size
+    );
+  }
+  context.restore();
 }
 
 function startAudio() {
@@ -1194,6 +1295,7 @@ function updateBossMeteors(deltaTime) {
 function update(deltaTime, now) {
   updateEffects(now);
   updateParticles(deltaTime);
+  updateBossExplosion(deltaTime);
   if (state === "boss") {
     updateBoss(deltaTime);
     return;
@@ -1276,6 +1378,7 @@ function updateBoss(deltaTime) {
     if (boss.hp <= 0) {
       boss.active = false;
       state = "bossVictory";
+      startBossExplosion();
     }
   }
 

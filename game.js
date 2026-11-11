@@ -188,12 +188,20 @@ let paddleWidthBeforePowerUp = CONFIG.paddleWidth;
 let levelElapsed = 0;
 let pausedFromState = "playing";
 let bossMeteorElapsed = 0;
-let musicGain = null;
-let musicSource = null;
-let musicTrackGain = null;
+const musicTracks = {
+  dialogue: new Audio("Audios_game/fase_1.mp3"),
+  gameplay: new Audio("Audios_game/fase_2.mp3"),
+  boss: new Audio("Audios_game/fase_3.mp3")
+};
+let musicEnabled = false;
+let currentMusicTrack = null;
 let musicPlaying = false;
-let musicTheme = null;
-let musicPlaybackRate = 1;
+
+Object.values(musicTracks).forEach((track) => {
+  track.loop = true;
+  track.preload = "auto";
+  track.volume = 0.22;
+});
 
 function createBricks() {
   bricks.length = 0;
@@ -304,13 +312,13 @@ function startAtLevel(selectedLevel) {
   levelElapsed = 0;
   createBricks();
   resetBall();
-  startAudio();
   if (level === 5) {
     initBoss();
     state = "boss";
   } else {
     state = "playing";
   }
+  startAudio();
 }
 
 function drawStars() {
@@ -518,114 +526,45 @@ function startAudio() {
   if (audioContext?.state === "suspended") {
     audioContext.resume();
   }
-  if (audioContext && !musicSource) {
-    startSpaceMusic();
-  }
-}
-
-function startSpaceMusic() {
-  const sampleRate = audioContext.sampleRate;
-  const isBossTheme = level >= 5;
-  const duration = 8;
-  const buffer = audioContext.createBuffer(1, sampleRate * duration, sampleRate);
-  const samples = buffer.getChannelData(0);
-  const melody = isBossTheme
-    ? [220, 233.08, 311.13, 277.18, 415.3, 311.13, 233.08, 207.65, 220, 349.23, 311.13, 466.16, 415.3, 311.13, 277.18, 207.65]
-    : [220, 329.63, 392, 329.63, 261.63, 392, 440, 392, 196, 293.66, 349.23, 293.66, 220, 329.63, 392, 329.63];
-  const bassNotes = isBossTheme
-    ? [55, 55, 65.41, 55, 73.42, 65.41, 55, 49]
-    : [55, 82.41, 65.41, 98];
-  const chords = isBossTheme
-    ? [[110, 164.81, 207.65], [103.83, 155.56, 196], [98, 146.83, 185], [110, 164.81, 207.65]]
-    : [[110, 164.81, 220], [130.81, 196, 261.63], [146.83, 220, 293.66], [98, 146.83, 196]];
-  const beatDuration = isBossTheme ? 0.3 : 0.48;
-  const stepDuration = beatDuration / 2;
-
-  for (let index = 0; index < samples.length; index += 1) {
-    const time = index / sampleRate;
-    const beat = Math.floor(time / beatDuration);
-    const beatTime = time - beat * beatDuration;
-    const chord = chords[Math.floor(time / (beatDuration * 8)) % chords.length];
-    let sample = 0;
-
-    for (let voice = 0; voice < chord.length; voice += 1) {
-      const modulation = 0.75 + 0.25 * Math.sin(time * (isBossTheme ? 2.2 : 0.8) + voice * 1.8);
-      sample += Math.sin(2 * Math.PI * chord[voice] * time) * (isBossTheme ? 0.025 : 0.03) * modulation;
-    }
-
-    const step = Math.floor(time / stepDuration);
-    const noteTime = time - step * stepDuration;
-    const note = melody[step % melody.length];
-    const noteEnvelope = Math.exp(-noteTime * (isBossTheme ? 5.5 : 4));
-    sample += Math.sin(2 * Math.PI * note * noteTime) * (isBossTheme ? 0.12 : 0.11) * noteEnvelope;
-    sample += Math.sin(2 * Math.PI * note * 2.01 * noteTime) * 0.025 * noteEnvelope;
-
-    const bass = bassNotes[Math.floor(beat / 2) % bassNotes.length];
-    const kickEnvelope = Math.exp(-beatTime * (isBossTheme ? 15 : 12));
-    const kickFrequency = (isBossTheme ? 90 : 72) - 30 * Math.min(beatTime / 0.12, 1);
-    sample += Math.sin(2 * Math.PI * kickFrequency * beatTime) * (isBossTheme ? 0.22 : 0.16) * kickEnvelope;
-    sample += Math.sin(2 * Math.PI * bass * time) * (isBossTheme ? 0.07 : 0.055);
-
-    if (beat % 2 === 1) {
-      const tickEnvelope = Math.exp(-beatTime * 45);
-      const tick = Math.sin(2 * Math.PI * (isBossTheme ? 1450 : 1100) * beatTime);
-      sample += tick * (isBossTheme ? 0.055 : 0.035) * tickEnvelope;
-    }
-
-    samples[index] = Math.max(-0.8, Math.min(0.8, sample));
-  }
-
-  if (!musicGain) {
-    musicGain = audioContext.createGain();
-    musicGain.gain.value = 0;
-    musicGain.connect(audioContext.destination);
-  }
-
-  const previousSource = musicSource;
-  const previousTrackGain = musicTrackGain;
-  musicSource = audioContext.createBufferSource();
-  musicSource.buffer = buffer;
-  musicSource.loop = true;
-  musicSource.playbackRate.value = musicPlaybackRate;
-  musicTrackGain = audioContext.createGain();
-  musicTrackGain.gain.value = 0;
-  musicSource.connect(musicTrackGain);
-  musicTrackGain.connect(musicGain);
-  musicSource.start();
-  musicTheme = isBossTheme ? "boss" : "space";
-
-  const now = audioContext.currentTime;
-  musicTrackGain.gain.setTargetAtTime(musicPlaying ? 1 : 0, now, 0.15);
-  if (previousSource && previousTrackGain) {
-    previousTrackGain.gain.setTargetAtTime(0, now, 0.1);
-    previousSource.stop(now + 0.6);
-  }
+  musicEnabled = true;
+  updateMusicPlayback();
 }
 
 function updateMusicPlayback() {
-  if (!audioContext || !musicGain || audioContext.state !== "running") {
+  if (!musicEnabled) {
     return;
   }
 
-  const shouldPlay = state === "playing" || state === "boss" || state === "transition";
-  const desiredTheme = level >= 5 ? "boss" : "space";
-  if (desiredTheme !== musicTheme) {
-    startSpaceMusic();
+  let desiredTrack = null;
+  if (state === "intro" || state === "transition" || state === "bossVictory") {
+    desiredTrack = musicTracks.dialogue;
+  } else if (state === "playing" || state === "victory") {
+    desiredTrack = musicTracks.gameplay;
+  } else if (state === "boss") {
+    desiredTrack = musicTracks.boss;
   }
 
-  const now = audioContext.currentTime;
-  const targetPlaybackRate = Math.min(2.4, Math.sqrt(getBallSpeed() / CONFIG.ballSpeed));
-  if (Math.abs(targetPlaybackRate - musicPlaybackRate) >= 0.02) {
-    musicPlaybackRate = targetPlaybackRate;
-    musicSource.playbackRate.setTargetAtTime(musicPlaybackRate, now, 0.4);
+  if (desiredTrack !== currentMusicTrack) {
+    currentMusicTrack?.pause();
+    currentMusicTrack = desiredTrack;
+    musicPlaying = false;
+    if (currentMusicTrack) {
+      currentMusicTrack.currentTime = 0;
+    }
   }
 
-  if (shouldPlay !== musicPlaying) {
-    musicPlaying = shouldPlay;
-    musicGain.gain.cancelScheduledValues(now);
-    musicGain.gain.setValueAtTime(musicGain.gain.value, now);
-    musicGain.gain.linearRampToValueAtTime(shouldPlay ? 0.22 : 0, now + 0.6);
-    musicTrackGain.gain.setTargetAtTime(shouldPlay ? 1 : 0, now, 0.15);
+  if (currentMusicTrack && !musicPlaying) {
+    musicPlaying = true;
+    currentMusicTrack.play().catch((error) => {
+      musicPlaying = false;
+      if (error.name === "NotAllowedError") {
+        musicEnabled = false;
+        return;
+      }
+      console.error("Não foi possível reproduzir a música do jogo.", error);
+    });
+  } else if (!currentMusicTrack && musicPlaying) {
+    musicPlaying = false;
   }
 }
 
@@ -1349,7 +1288,10 @@ function canvasPosition(event) {
   return (event.clientX - bounds.left) * (CONFIG.canvasWidth / bounds.width);
 }
 
-canvas.addEventListener("pointerdown", () => canvas.focus());
+canvas.addEventListener("pointerdown", () => {
+  canvas.focus();
+  startAudio();
+});
 canvas.addEventListener("pointermove", (event) => {
   pointerX = canvasPosition(event);
 });
@@ -1377,15 +1319,15 @@ window.addEventListener("keydown", (event) => {
   if (["2", "3", "4", "5"].includes(event.key) && (state === "start" || state === "intro")) {
     startAtLevel(Number(event.key));
   } else if (event.key === " " && (state === "start" || state === "intro")) {
-    startAudio();
     levelElapsed = 0;
     state = "playing";
+    startAudio();
   } else if (event.key === " " && state === "victory") {
-    startAudio();
     nextLevel();
-  } else if (event.key === " " && state === "transition") {
     startAudio();
+  } else if (event.key === " " && state === "transition") {
     state = "playing";
+    startAudio();
   } else if ((event.key === "r" || event.key === "R") && state === "gameover") {
     resetGame();
   } else if ((event.key === "r" || event.key === "R") && state === "bossVictory") {

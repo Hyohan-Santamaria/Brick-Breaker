@@ -196,6 +196,7 @@ const musicTracks = {
 let musicEnabled = false;
 let currentMusicTrack = null;
 let musicPlaying = false;
+let musicRequestId = 0;
 
 Object.values(musicTracks).forEach((track) => {
   track.loop = true;
@@ -409,6 +410,15 @@ function drawIntro() {
     context.font = "16px monospace";
     context.fillText("PRESSIONE ESPAÇO PARA INICIAR", CONFIG.canvasWidth / 2, 560);
   }
+  if (window.location.protocol === "file:") {
+    context.fillStyle = "#ffcf70";
+    context.font = "12px monospace";
+    context.fillText(
+      "Para ouvir música: python -m http.server 8000 e abra localhost:8000.",
+      CONFIG.canvasWidth / 2,
+      538
+    );
+  }
   context.fillStyle = "#a9eaff";
   context.font = "13px monospace";
   context.fillText("TECLAS 2, 3, 4 OU 5: INICIAR DIRETO NO NÍVEL", CONFIG.canvasWidth / 2, 584);
@@ -545,6 +555,7 @@ function updateMusicPlayback() {
   }
 
   if (desiredTrack !== currentMusicTrack) {
+    musicRequestId += 1;
     currentMusicTrack?.pause();
     currentMusicTrack = desiredTrack;
     musicPlaying = false;
@@ -555,10 +566,17 @@ function updateMusicPlayback() {
 
   if (currentMusicTrack && !musicPlaying) {
     musicPlaying = true;
-    currentMusicTrack.play().catch((error) => {
+    const track = currentMusicTrack;
+    const requestId = ++musicRequestId;
+    track.play().catch((error) => {
+      if (requestId !== musicRequestId || track !== currentMusicTrack) {
+        return;
+      }
       musicPlaying = false;
-      if (error.name === "NotAllowedError") {
+      if (error.name === "NotAllowedError" || error.name === "NotSupportedError") {
         musicEnabled = false;
+      }
+      if (error.name === "AbortError" || error.name === "NotAllowedError") {
         return;
       }
       console.error("Não foi possível reproduzir a música do jogo.", error);

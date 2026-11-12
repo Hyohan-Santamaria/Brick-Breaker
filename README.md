@@ -22,6 +22,17 @@ Também é possível usar a extensão Live Server. Abrir o `index.html` diretame
 como `file:///` pode impedir que alguns navegadores reproduzam os arquivos de
 áudio.
 
+## Estrutura do projeto
+
+- `index.html`: página e canvas do jogo.
+- `src/main.js`: ponto de entrada; inicializa o jogo.
+- `src/game.js`: estado, regras, colisões, fases e ciclo principal.
+- `src/render.js`: desenho do canvas e das telas.
+- `src/input.js`: teclado, mouse e ações dos controles.
+- `src/audio.js`: músicas e efeitos sonoros.
+- `src/config.js`: configurações, sprites e textos das fases.
+- `Audios_game/`: arquivos das trilhas em MP3.
+
 ## Controles
 
 - `Espaço`: iniciar o jogo ou continuar para a próxima fase.
